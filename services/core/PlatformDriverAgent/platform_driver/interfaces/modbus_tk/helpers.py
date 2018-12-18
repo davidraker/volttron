@@ -38,6 +38,7 @@ USHORT = ("H", 1, 1)
 BOOL = ("?", 1, 1)
 CHAR = ("c", 1, 1)
 STRING = ("s", 2, 1)
+PAD = ("x", 2, 1)
 
 # BYTE Ordering
 BIG = 'big'
@@ -94,6 +95,10 @@ def array(type, length):
 
 def string(length):
     return 's', 1, length
+
+
+def pad(length):
+    return 'x', 1, length
 
 
 def str2bool(str_val):
