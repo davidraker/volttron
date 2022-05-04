@@ -54,6 +54,7 @@ import six.moves
 import logging
 import math
 
+from volttron.platform.agent import utils
 import modbus_tk.defines as modbus_constants
 import modbus_tk.modbus_tcp as modbus_tcp
 import modbus_tk.modbus_rtu as modbus_rtu
@@ -62,6 +63,9 @@ from platform_driver.driver_locks import client_socket_locks
 
 from . import helpers
 
+
+# utils.setup_logging()
+# _log = logging.getLogger(__name__)
 logger = logging.getLogger(__name__)
 
 # In cache representation of modbus field.
@@ -669,7 +673,6 @@ class Client:
         return self.__meta[helpers.META_REQUEST_MAP].get(field, None)
 
     def read_request(self, request):
-        logger.debug(f"Requesting: {request} on {self.device_address}:{self.port}-{self.slave_address}")
         try:
             results = self.client.execute(
                 self.slave_address,
@@ -679,6 +682,7 @@ class Client:
                 data_format=request.formatting,
                 threadsafe=False
             )
+            logger.debug("Successfully read the request...")
             self._data.update(request.parse_values(results))
         except (AttributeError, ModbusError) as err:
             if err is ModbusError:
@@ -691,26 +695,36 @@ class Client:
         requests = self.__meta[helpers.META_REQUESTS]
         self._data.clear()
         with client_socket_locks(self.device_address, self.port):
-            logger.debug(f"entered lock for {self.device_address}:{self.port}-{self.slave_address}")
+            logger.debug(f"Entered lock for {self.device_address}:{self.port}-{self.slave_address}")
+            logger.debug(f"Total requests to be read: {len(requests)}")
             for r in requests:
+                logger.debug(f"Attempting to read_request on request: {r}")
                 retries = 3
                 while retries > 0:
+                    logger.debug(f"Retry: {retries}")
                     exception_flag = False
                     try:
                         self.read_request(r)
-                        continue
+                        break
                     except ConnectionResetError:
                         exception_flag = True
-                        logger.warning("ConnectionResetError on read_all()")
+                        logger.warning("ConnectionResetError on read_request()")
+                        logger.warning(f"Error response: {e}")
                     except ModbusInvalidResponseError as e:
                         exception_flag = True
-                        logger.warning("ModbusInvalidResponseError on read_all()")
-                        logger.warning(f"The exception MSG: {e}")
+                        logger.warning("ModbusInvalidResponseError on read_request()")
+                        logger.warning(f"Error response: {e}")
                     if exception_flag:
                         self.client.close()
                         gevent.sleep(1.0)
                         self.client.open()
                     retries -= 1
+
+                if retries == 0:
+                    logger.debug(f"Failed to read request: {r}")
+                else:
+                    logger.debug(f"Succesfully read the request on retry: {retries}")
+
         logger.debug(f"left lock for {self.device_address}:{self.port}-{self.slave_address}")
 
     def dump_all(self):
