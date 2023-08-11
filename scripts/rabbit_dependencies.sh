@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -e
-ubuntu_list=(bionic focal)
-list=(buster )
+ubuntu_list=(bionic focal jammy)
+debian_list=(buster bullseye bookworm trixie)
 list=("${ubuntu_list[@]}" "${debian_list[@]}")
 declare -A ubuntu_versions
-ubuntu_versions=( ["ubuntu-18.04"]="bionic" ["ubuntu-20.04"]="focal")
+ubuntu_versions=( ["ubuntu-18.04"]="bionic" ["ubuntu-20.04"]="focal" ["ubuntu-22.04"]="jammy" )
 
 function exit_on_error {
     rc=$?
@@ -143,7 +143,7 @@ is_arm="FALSE"
 ${prefix} pwd > /dev/null
 
 if [[ "$os_name" == "debian" ]]; then
-    erlang_package_version="1:24.1.7-1"
+    erlang_package_version="1:25.0.2-1"
     is_arm="FALSE"
     install_on_debian
 elif [[ "$os_name" == "centos" ]]; then
