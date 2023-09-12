@@ -415,7 +415,7 @@ def get_container_func(request):
     print(f"image: {image} historian schema; version {historian_version}")
     if historian_version == "<4.0.0" and image.startswith("mysql:8"):
         pytest.skip(
-            msg=f"Default schema of historian version <4.0.0 "
+            reason=f"Default schema of historian version <4.0.0 "
             f"will not work in mysql version > 5. Skipping tests "
             f"for this parameter combination ",
             allow_module_level=True,

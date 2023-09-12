@@ -44,14 +44,14 @@ import gevent
 import pytest
 from mock import MagicMock
 
-from volttron.platform import get_services_core, get_examples, jsonapi
+from volttron.platform import get_services_core, get_examples, jsonapi, is_rabbitmq_available
 from volttrontesting.utils.platformwrapper import PlatformWrapper, with_os_environ
 from volttrontesting.utils.utils import get_rand_tcp_address, get_rand_http_address
 
 
 @pytest.mark.parametrize("messagebus, ssl_auth", [
     ('zmq', False)
-    , ('rmq', True)
+    , pytest.param('rmq', True, marks=pytest.mark.skipif(not is_rabbitmq_available(), reason='RabbitMQ is not available.'))
     , ('zmq', True)
 ])
 def test_can_create(messagebus, ssl_auth):

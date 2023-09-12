@@ -655,7 +655,7 @@ class BasicRevert(object, metaclass=abc.ABCMeta):
         and the value to revert the point to for every writable
         point on a device.
 
-        Currently \*\*kwargs is ignored.
+        Currently, kwargs is ignored.
         """
         """Revert entire device to it's default state"""
         points = self._tracker.get_all_revert_values()
@@ -679,7 +679,7 @@ class BasicRevert(object, metaclass=abc.ABCMeta):
         :param point_name: Name of the point to revert.
         :type point_name: str
 
-        Currently \*\*kwargs is ignored.
+        Currently, kwargs is ignored.
         """
         try:
             value = self._tracker.get_revert_value(point_name)

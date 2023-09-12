@@ -2,13 +2,15 @@
 Test cases to test agent configuration
 """
 import pytest
+from pathlib import Path
 from volttron.platform.agent.utils import load_config
 
 def test_load_config_with_valid_config():
     """
     Test that load_config correctly loads a valid config file and path
     """
-    config_path = "./test_config"
+
+    config_path = f"{Path(__file__).parent.absolute().resolve()}/test_config"
     expected_json = {
         "testKey": "testValue"
     }
