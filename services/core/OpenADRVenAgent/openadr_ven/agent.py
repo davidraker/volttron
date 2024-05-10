@@ -155,7 +155,7 @@ class OpenADRVenAgent(Agent):
     @RPC.export
     def add_report_capability(
         self,
-        callback: Callable,
+        callback_method_name: str,
         report_name: OpenADRReportName,
         resource_id: str,
         measurement: OpenADRMeasurements,
@@ -165,14 +165,22 @@ class OpenADRVenAgent(Agent):
         This method is remotely accessible by other agents through Volttron's feature Remote Procedure Call (RPC);
         for reference on RPC, see https://volttron.readthedocs.io/en/develop/platform-features/message-bus/vip/vip-json-rpc.html?highlight=remote%20procedure%20call
 
-        :param callback: A callback or coroutine that will fetch the value for a specific report. This callback will be passed the report_id and the r_id of the requested value.
+        :param callback_method_name: A callback or coroutine that will fetch the value for a specific report. This callback will be passed the report_id and the r_id of the requested value.
         :param report_name: An OpenADR name for this report
         :param resource_id: A specific name for this resource within this report.
         :param measurement: The quantity that is being measured
         :return: Returns a tuple consisting of a report_specifier_id (str) and an r_id (str) an identifier for OpenADR messages
         """
+        def callback_wrapper(peer, method_name):
+            def func(report_id, r_id):
+                try:
+                    return self.vip.rpc.call(peer, method_name, report_id, r_id).get(timeout=10)
+                except (Exception, gevent.Timeout) as e:
+                    _log.warning(f'Encountered exception making callback for report_id: {report_id}: {e}')
+            return func
+
         report_specifier_id, r_id = self.ven_client.add_report(
-            callback=callback,
+            callback=callback_wrapper(self.vip.rpc.context.vip_message.peer, callback_method_name),
             report_name=report_name,
             resource_id=resource_id,
             measurement=measurement,
