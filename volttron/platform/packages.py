@@ -37,8 +37,7 @@ import zipfile
 
 from volttron.platform import jsonapi
 
-from wheel.install import WheelFile
-from wheel.util import native, open_for_csv
+from wheel.wheelfile import WheelFile
 
 
 __all__ = ('BasePackageVerifier', 'VolttronPackageWheelFileNoSign',
@@ -59,7 +58,7 @@ class VolttronPackageWheelFileNoSign(WheelFile):
     def contains(self, path):
         '''Does the wheel contain the specified path?'''
 
-        for x in self.zipfile.filelist:
+        for x in self.filelist:
             if x.filename == path:
                 return True
         return False
@@ -79,15 +78,15 @@ class VolttronPackageWheelFileNoSign(WheelFile):
 #
         tmp_dir = tempfile.mkdtemp()
         try:
-            record_path = '/'.join((self.distinfo_name, last_record_name))
-            tmp_new_record_file = '/'.join((tmp_dir, self.distinfo_name,
+            record_path = '/'.join((self.dist_info_path, last_record_name))
+            tmp_new_record_file = '/'.join((tmp_dir, self.dist_info_path,
                                             last_record_name))
-            self.zipfile.extract('/'.join((self.distinfo_name, last_record_name)),
+            self.extract('/'.join((self.dist_info_path, last_record_name)),
                                  path = tmp_dir)
 
-            self.remove_files('/'.join((self.distinfo_name, 'config')))
+            self.remove_files('/'.join((self.dist_info_path, 'config')))
 
-            with closing(open_for_csv(tmp_new_record_file,"a+")) as record_file:
+            with closing(open(tmp_new_record_file,"a+", newline='')) as record_file:
                 writer = csv.writer(record_file)
 
 
@@ -99,11 +98,11 @@ class VolttronPackageWheelFileNoSign(WheelFile):
                             _log.error("couldn't access {}" % files_to_add['config_file'])
                             raise
 
-                        self.zipfile.writestr("%s/%s" % (self.distinfo_name, 'config'),
+                        self.writestr("%s/%s" % (self.dist_info_path, 'config'),
                                               data)
 
                         (hash_data, size, digest) = self._record_digest(data)
-                        record_path = '/'.join((self.distinfo_name, 'config'))
+                        record_path = '/'.join((self.dist_info_path, 'config'))
                         writer.writerow((record_path, hash_data, size))
 
                     if 'identity_file' in files_to_add:
@@ -113,11 +112,11 @@ class VolttronPackageWheelFileNoSign(WheelFile):
                             _log.error("couldn't access {}" % files_to_add['identity_file'])
                             raise
 
-                        self.zipfile.writestr("%s/%s" % (self.distinfo_name, 'IDENTITY_TEMPLATE'),
+                        self.writestr("%s/%s" % (self.dist_info_path, 'IDENTITY_TEMPLATE'),
                                               data)
 
                         (hash_data, size, digest) = self._record_digest(data)
-                        record_path = '/'.join((self.distinfo_name, 'IDENTITY_TEMPLATE'))
+                        record_path = '/'.join((self.dist_info_path, 'IDENTITY_TEMPLATE'))
                         writer.writerow((record_path, hash_data, size))
 
                     if 'contract' in files_to_add and files_to_add['contract'] is not None:
@@ -134,10 +133,10 @@ class VolttronPackageWheelFileNoSign(WheelFile):
                             sys.stderr.write(msg)
                             _log.warning(msg)
 
-                        self.zipfile.writestr("%s/%s" % (self.distinfo_name, 'execreqs.json'),
+                        self.writestr("%s/%s" % (self.dist_info_path, 'execreqs.json'),
                                               data)
                         (hash_data, size, digest) = self._record_digest(data)
-                        record_path = '/'.join((self.distinfo_name, 'execreqs.json'))
+                        record_path = '/'.join((self.dist_info_path, 'execreqs.json'))
                         writer.writerow((record_path, hash_data, size))
 
 
@@ -146,10 +145,10 @@ class VolttronPackageWheelFileNoSign(WheelFile):
             self.pop_records_file()
 
             new_record_content = open(tmp_new_record_file, 'r').read()
-            self.zipfile.writestr(self.distinfo_name+"/"+last_record_name,
+            self.writestr(self.dist_info_path+"/"+last_record_name,
                     new_record_content)
 
-            self.zipfile.close()
+            self.close()
             self.__setupzipfile__()
         finally:
             shutil.rmtree(tmp_dir, True)
@@ -157,7 +156,7 @@ class VolttronPackageWheelFileNoSign(WheelFile):
     def pop_records_file(self):
         '''Pop off the last records file that was added'''
         records = ZipPackageVerifier(self.filename).get_records()
-        topop = (os.path.join(self.distinfo_name, records[0]),)
+        topop = (os.path.join(self.dist_info_path, records[0]),)
         self.remove_files(topop)
 
     def pop_record_and_files(self):
@@ -167,13 +166,12 @@ class VolttronPackageWheelFileNoSign(WheelFile):
         '''
         records = ZipPackageVerifier(self.filename).get_records()
         record = records.pop(0)
-        zf = self.zipfile
         keep = set(row[0] for name in records for row in
-            csv.reader(zf.open(posixpath.join(self.distinfo_name, name))))
+            csv.reader(self.open(posixpath.join(self.dist_info_path, name))))
         drop = set(row[0] for row in
-            csv.reader(zf.open(posixpath.join(self.distinfo_name, record))))
+            csv.reader(self.open(posixpath.join(self.dist_info_path, record))))
         # These two should already be listed, but add them just in case
-        drop.add(posixpath.join(self.distinfo_name, record))
+        drop.add(posixpath.join(self.dist_info_path, record))
         self.remove_files(drop - keep)
 
     def remove_files(self, files):
@@ -184,11 +182,11 @@ class VolttronPackageWheelFileNoSign(WheelFile):
         try:
             newzip = zipfile.ZipFile(os.path.join(tmpdir, 'tmp.zip'), 'w')
             with newzip:
-                for f in self.zipfile.infolist():
+                for f in self.infolist():
                     if f.filename not in files:
-                        buf = self.zipfile.read(f.filename)
+                        buf = self.read(f.filename)
                         newzip.writestr(f.filename, buf)
-            self.zipfile.close()
+            self.close()
             self.fp = None
             os.remove(self.filename)
             shutil.move(newzip.filename, self.filename)
@@ -200,8 +198,8 @@ class VolttronPackageWheelFileNoSign(WheelFile):
         namever = self.parsed_filename.group('namever')
         destination = os.path.join(dest, namever)
         sys.stderr.write("Unpacking to: %s\n" % (destination))
-        self.zipfile.extractall(destination)
-        self.zipfile.close()
+        self.extractall(destination)
+        self.close()
 
     def _record_digest(self, data):
         '''Returns a three tuple of hash, size and digest.'''
@@ -209,21 +207,9 @@ class VolttronPackageWheelFileNoSign(WheelFile):
         from wheel.util import urlsafe_b64encode
 
         digest = hashlib.sha256(data.encode("utf-8")).digest()
-        hash_text = 'sha256=' + native(urlsafe_b64encode(digest))
+        hash_text = 'sha256=' + urlsafe_b64encode(digest).decode('ascii')
         size = len(data)
         return (hash_text, size, digest)
-
-    def __setupzipfile__(self):
-        self.zipfile.close()
-        self.fp = None
-
-        mode = 'r'
-        if self.append:
-            mode = 'a'
-
-        self.zipfile = zipfile.ZipFile(self.filename,
-                                               mode=mode,
-                              )
 
 
 _record_re = re.compile(r'^RECORD(?:\.\d+)?$')
