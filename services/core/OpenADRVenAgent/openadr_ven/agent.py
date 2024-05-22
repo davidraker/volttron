@@ -23,6 +23,7 @@
 # }}}
 import logging
 import asyncio
+import asyncio_gevent
 import sys
 import gevent
 
@@ -291,6 +292,7 @@ class OpenADRVenAgent(Agent):
 
 def main():
     """Main method called to start the agent."""
+    asyncio.set_event_loop_policy(asyncio_gevent.EventLoopPolicy())
     vip_main(OpenADRVenAgent)
 
 

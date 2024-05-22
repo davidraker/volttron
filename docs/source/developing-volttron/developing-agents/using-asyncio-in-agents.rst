@@ -22,13 +22,37 @@ Before we dive into the example, we establish the following concepts:
 
 The general steps to use Asyncio within the Volttron Agent framework are the following:
 
-1. Create an async method.
-2. Create a method which creates and starts the Asyncio Event Loop.
-3. Use gevent.spawn (or spawn_later) to start a greenlet using the method in step 2.
+1. Import the asyncio_gevent library.
+2. Use asyncio_gevent to set asyncio to use an Event Loop Policy which uses greenlets for scheduling.
+3. Create an async method.
+4. Create a method which creates and starts the Asyncio Event Loop.
+5. Use gevent.spawn (or spawn_later) to start a greenlet using the method in step 2.
 
 Below are code examples of how to implement the steps within an agent. For demonstration purposes, we name this agent, ExampleAsyncioAgent.
 
-Step 1: Create an async method.
+Step 1: Import the asyncio_gevent library.
+
+.. code-block:: python
+
+    import asyncio_gevent
+
+The asyncio_gevent library provides integration allowing asyncio to run on top of gevent.  It can be installed from Pypi
+using pip, and should be included in the package requirements.
+
+Step 2: Set the asyncio Event Loop Policy.
+
+.. code-block:: python
+
+    def main():
+    """Main method called to start the agent."""
+    asyncio.set_event_loop_policy(asyncio_gevent.EventLoopPolicy())
+    vip_main(ExampleAsyncioAgent)
+
+The Event Loop Policy provided by asyncio_gevent allows the asyncio event loop to work cooperatively with gevent.
+This should be set before the agent starts, but after logging has been set up. A good place to do this in in the main()
+function immediately before the call to start the agent.
+
+Step 3: Create an async method.
 
 .. code-block:: python
 
@@ -42,7 +66,7 @@ Step 1: Create an async method.
             return "hello!"
 
 
-Step 2. Create a method which creates and starts the Asyncio Event Loop.
+Step 4. Create a method which creates and starts the Asyncio Event Loop.
 
 .. code-block:: python
 
@@ -55,7 +79,7 @@ Step 2. Create a method which creates and starts the Asyncio Event Loop.
             loop.run_forever()
 
 
-Step 3.  Use gevent.spawn (or spawn_later) to start a greenlet using the method in step 2.
+Step 5.  Use gevent.spawn (or spawn_later) to start a greenlet using the method in step 2.
 
 .. code-block:: python
 
@@ -78,6 +102,7 @@ To review, below is the complete agent class with all the relevant and aforement
 
     import gevent
     import asyncio
+    import asyncio_gevent
 
     class ExampleAsyncioAgent(Agent):
 
@@ -97,6 +122,10 @@ To review, below is the complete agent class with all the relevant and aforement
             await asyncio.sleep(1)
             return "hello!"
 
+    def main():
+    """Main method called to start the agent."""
+    asyncio.set_event_loop_policy(asyncio_gevent.EventLoopPolicy())
+    vip_main(ExampleAsyncioAgent)
 
 References
 

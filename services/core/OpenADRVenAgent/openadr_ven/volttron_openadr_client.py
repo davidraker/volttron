@@ -156,4 +156,4 @@ class VolttronOpenADRClient(OpenADRClientInterface):
         self._openadr_client.add_handler(event, function)
 
     def add_report(self, callback, report_name, resource_id, measurement):
-        self._openadr_client.add_report(callback, report_name, resource_id, measurement)
+        return self._openadr_client.add_report(callback, resource_id, report_name=report_name, measurement=measurement)
