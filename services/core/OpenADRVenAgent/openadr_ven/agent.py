@@ -23,9 +23,11 @@
 # }}}
 import logging
 import asyncio
+import asyncio_gevent
 import sys
 import gevent
 
+from datetime import timedelta
 from pathlib import Path
 from pprint import pformat
 
@@ -89,7 +91,14 @@ class OpenADRVenAgent(Agent):
         else:
             super(OpenADRVenAgent, self).__init__(enable_web=True, **kwargs)
 
-        self.default_config = self._parse_config(config_path)
+        try:
+            self.default_config = load_config(config_path)
+        except NameError as err:
+            _log.exception(err)
+            raise
+        except Exception as err:
+            _log.error(f"Error loading configuration: {err}")
+            self.default_config = {}
 
         # SubSystem/ConfigStore
         self.vip.config.set_default("config", self.default_config)
@@ -110,6 +119,9 @@ class OpenADRVenAgent(Agent):
         """
         config = self.default_config.copy()
         config.update(contents)
+
+        config = self._parse_config(config)
+
 
         _log.info(f"config_name: {config_name}, action: {action}")
         _log.info(f"Configuring VEN client with: \n {pformat(config)} ")
@@ -155,27 +167,73 @@ class OpenADRVenAgent(Agent):
     @RPC.export
     def add_report_capability(
         self,
-        callback: Callable,
-        report_name: OpenADRReportName,
+        callback_method_name: str,
         resource_id: str,
-        measurement: OpenADRMeasurements,
+        measurement: str,
+        data_collection_mode: str = 'incremental',
+        report_specifier_id=None,
+        r_id=None,
+        report_name='TELEMETRY_USAGE',
+        reading_type='DIRECT_READ',
+        report_type='READING',
+        report_duration_seconds=None,
+        report_dtstart=None,
+        sampling_rate_seconds=None,
+        data_source=None,
+        scale="none",
+        unit=None,
+        power_ac=True,
+        power_hertz=50,
+        power_voltage=230,
+        market_context=None,
+        end_device_asset_mrid=None,
+        report_data_source=None
     ) -> tuple:
         """Add a new reporting capability to the client.
 
         This method is remotely accessible by other agents through Volttron's feature Remote Procedure Call (RPC);
         for reference on RPC, see https://volttron.readthedocs.io/en/develop/platform-features/message-bus/vip/vip-json-rpc.html?highlight=remote%20procedure%20call
 
-        :param callback: A callback or coroutine that will fetch the value for a specific report. This callback will be passed the report_id and the r_id of the requested value.
+        :param callback_method_name: A callback or coroutine that will fetch the value for a specific report. This callback will be passed the report_id and the r_id of the requested value.
         :param report_name: An OpenADR name for this report
         :param resource_id: A specific name for this resource within this report.
         :param measurement: The quantity that is being measured
         :return: Returns a tuple consisting of a report_specifier_id (str) and an r_id (str) an identifier for OpenADR messages
         """
+        def callback_wrapper(peer, method_name, collection_mode):
+
+            async def full(date_from, date_to, sampling_interval):
+                try:
+                    return self.vip.rpc.call(peer, method_name, format_timestamp(date_from), format_timestamp(date_to),
+                                             sampling_interval.total_seconds).get(timeout=10)
+                except (Exception, gevent.Timeout) as e:
+                    _log.warning(f'Encountered exception making callback: {e}')
+
+            async def incremental():
+                try:
+                    return self.vip.rpc.call(peer, method_name).get(timeout=10)
+                except (Exception, gevent.Timeout) as e:
+                    _log.warning(f'Encountered exception making callback: {e}')
+
+            # OpenLEADR doesn't actually support other collection_modes yet, but could.
+            async def generic(*args, **kwargs):
+                try:
+                    return self.vip.rpc.call(peer, method_name, *args, **kwargs).get(timeout=10)
+                except (Exception, gevent.Timeout) as e:
+                    _log.warning(f'Encountered exception making callback: {e}')
+
+            return full if collection_mode == 'full' else incremental if collection_mode == 'incremental' else generic
+
+        report_duration = timedelta(seconds=report_duration_seconds) if report_duration_seconds is not None else None
+        sampling_rate = timedelta(seconds=sampling_rate_seconds) if sampling_rate_seconds is not None else None
         report_specifier_id, r_id = self.ven_client.add_report(
-            callback=callback,
-            report_name=report_name,
-            resource_id=resource_id,
-            measurement=measurement,
+            callback=callback_wrapper(self.vip.rpc.context.vip_message.peer, callback_method_name, data_collection_mode),
+            resource_id=resource_id, measurement=measurement, data_collection_mode=data_collection_mode,
+            report_specifier_id=report_specifier_id, r_id=r_id, report_name=report_name, reading_type=reading_type,
+            report_type=report_type, report_duration=report_duration, report_dtstart=report_dtstart,
+            sampling_rate=sampling_rate, data_source=data_source, scale=scale, unit=unit, power_ac=power_ac,
+            power_hertz=power_hertz, power_voltage=power_voltage, market_context=market_context,
+            end_device_asset_mrid=end_device_asset_mrid, report_data_source=report_data_source
         )
         _log.info(
             f"Output from add_report: report_specifier_id: {report_specifier_id}, r_id: {r_id}"
@@ -208,20 +266,12 @@ class OpenADRVenAgent(Agent):
         return
 
     # ***************** Helper methods ********************
-    def _parse_config(self, config_path: str) -> Dict:
-        """Parses the OpenADR agent's configuration file.
+    def _parse_config(self, config: dict) -> Dict:
+        """Parses the OpenADR agent's configuration.
 
         :param config_path: The path to the configuration file
         :return: The configuration
         """
-        try:
-            config = load_config(config_path)
-        except NameError as err:
-            _log.exception(err)
-            raise
-        except Exception as err:
-            _log.error("Error loading configuration: {}".format(err))
-            config = {}
 
         if not config:
             raise Exception("Configuration cannot be empty.")
@@ -283,6 +333,7 @@ class OpenADRVenAgent(Agent):
 
 def main():
     """Main method called to start the agent."""
+    asyncio.set_event_loop_policy(asyncio_gevent.EventLoopPolicy())
     vip_main(OpenADRVenAgent)
 
 

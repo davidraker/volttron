@@ -21,9 +21,10 @@
 #
 # ===----------------------------------------------------------------------===
 # }}}
+import asyncio
+import logging
 
-
-from openleadr.client import OpenADRClient
+from openleadr.client import OpenADRClient, enums
 from openleadr.objects import Event
 from volttron.platform import jsonapi
 import abc
@@ -44,7 +45,10 @@ from .constants import (
 from openleadr.enums import OPT, REPORT_NAME, MEASUREMENTS
 from datetime import timedelta, datetime, date, time, timezone
 from typing import Callable
-from volttron.platform.agent.utils import format_timestamp
+from volttron.platform.agent.utils import format_timestamp, setup_logging
+
+setup_logging()
+_log = logging.getLogger(__name__)
 
 
 class OpenADRReportName(REPORT_NAME):
@@ -150,10 +154,32 @@ class VolttronOpenADRClient(OpenADRClientInterface):
         await self._openadr_client.run()
 
     def get_ven_name(self):
-        self._openadr_client.ven_name
+        return self._openadr_client.ven_name
 
     def add_handler(self, event, function):
         self._openadr_client.add_handler(event, function)
 
-    def add_report(self, callback, report_name, resource_id, measurement):
-        self._openadr_client.add_report(callback, report_name, resource_id, measurement)
+    def add_report(self, callback, resource_id, measurement=None,
+                   data_collection_mode='incremental',
+                   report_specifier_id=None, r_id=None,
+                   report_name='TELEMETRY_USAGE',
+                   reading_type=enums.READING_TYPE.DIRECT_READ,
+                   report_type=enums.REPORT_TYPE.READING,
+                   report_duration=None, report_dtstart=None,
+                   sampling_rate=None, data_source=None,
+                   scale="none", unit=None, power_ac=True, power_hertz=50, power_voltage=230,
+                   market_context=None, end_device_asset_mrid=None, report_data_source=None):
+
+        report_specifier_id, r_id = self._openadr_client.add_report(callback, resource_id, measurement, data_collection_mode,
+                                               report_specifier_id, r_id, report_name, reading_type, report_type,
+                                               report_duration, report_dtstart, sampling_rate, data_source, scale, unit,
+                                               power_ac, power_hertz, power_voltage, market_context,
+                                               end_device_asset_mrid, report_data_source)
+        _log.info(f'######### REPORTS HAS: {self._openadr_client.reports}')
+        if self._openadr_client.reports:
+            asyncio.ensure_future(self._openadr_client.register_reports(self._openadr_client.reports))
+            self._openadr_client.report_queue_task = self._openadr_client.loop.create_task(
+                self._openadr_client._report_queue_worker())
+        else:
+            _log.info('########## FAILED TO FIND A REPORT')
+        return report_specifier_id, r_id
