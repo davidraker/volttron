@@ -64,14 +64,14 @@ class DriverAgent(BasicAgent):
                                  default_publish_depth_first,
                                  default_publish_breadth_first)
 
-
-        try:
-            interval = int(config.get("interval", 60))
-            if interval < 1.0:
-                raise ValueError
-        except ValueError:
-            _log.warning("Invalid device scrape interval {}. Defaulting to 60 seconds.".format(config.get("interval")))
-            interval = 60
+        interval = int(config.get("interval", 60))
+        # try:
+        #     interval = int(config.get("interval", 60))
+        #     if interval < 1.0:
+        #         raise ValueError
+        # except ValueError:
+        #     _log.warning("Invalid device scrape interval {}. Defaulting to 60 seconds.".format(config.get("interval")))
+        #     interval = 60
 
         self.interval = interval
         self.periodic_read_event = None
