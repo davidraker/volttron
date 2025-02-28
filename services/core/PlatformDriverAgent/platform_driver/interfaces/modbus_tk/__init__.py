@@ -84,6 +84,10 @@ class ModbusTKRegister(BaseRegister):
         self.type = field.type
         self.default_value = self.get_default_value(field.type, default_value)
 
+    @property
+    def is_pad(self):
+        return self.type[0] == 'x' if isinstance(self.type, tuple) else self.type == 'x'
+
     def get_python_type(self, datatype):
         """
             Get python type from field data type
@@ -95,8 +99,11 @@ class ModbusTKRegister(BaseRegister):
         :return: python type
         """
         # Python 2.7 strings are byte arrays, this no longer works for 3.x
-        if isinstance(datatype, tuple) and datatype[0] == 's':
-            return str
+        if isinstance(datatype, tuple):
+            if datatype[0] == 's':
+                return str
+            elif datatype[0] == 'x':
+                return None
         try:
             parse_struct = struct.Struct(datatype)
         except TypeError:
@@ -175,6 +182,22 @@ class Interface(BasicRevert, BaseInterface):
         super(Interface, self).__init__(**kwargs)
         self.name_map = dict()
         self.modbus_client = None
+
+    def get_register_names(self):
+        """
+        Get a list of register names.
+        :return: List of names
+        :rtype: list
+        """
+        return list(self.get_register_names_view())
+
+    def get_register_names_view(self):
+        """
+        Get a dictview of register names.
+        :return: Dictview of names
+        :rtype: dictview
+        """
+        return (k for k in self.point_map.keys() if not self.point_map[k].is_pad)
 
     def insert_register(self, register):
         """

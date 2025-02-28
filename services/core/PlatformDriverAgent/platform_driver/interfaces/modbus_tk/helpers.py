@@ -98,7 +98,7 @@ def string(length):
 
 
 def pad(length):
-    return 'x', 1, length
+    return 'x', 1, length * 2
 
 
 def str2bool(str_val):

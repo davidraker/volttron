@@ -110,7 +110,7 @@ class Field:
     @property
     def is_pad(self):
         """Returns True if the register is a pad register"""
-        return True if self.format_string == 'x' else False
+        return True if self._type[helpers.FORMAT] == 'x' else False
 
     @property
     def is_struct_format(self):
@@ -436,8 +436,9 @@ class Request:
         return self._table == field.table and \
            self._next_address == field.address and \
            self._count + math.ceil(struct.calcsize(field.format_string) / 2.0) < 124 and \
-           field.length == 1 and not field.byte_order and \
-           not field.is_struct_format
+           not field.byte_order and \
+           not field.is_struct_format\
+           # and field.length == 1  # TODO: Removed this to allow pad registers, but does this break strings or arrays?
 
     def add_field(self, field):
         """Add field to request if it is compatible and contiguous
@@ -479,10 +480,9 @@ class Request:
                     if len(results) > 1:
                         results = (results,)
             # Everything else))
+            non_pad_fields = (f for f in self.fields if not f.is_pad)
             field_values = collections.OrderedDict(
-                [(field, Datum(value, now))
-                 for field, value in zip(self.fields, results)
-                 if not field.is_pad]
+                [(field, Datum(value, now)) for field, value in zip(non_pad_fields, results)]
             )
         return field_values
 
