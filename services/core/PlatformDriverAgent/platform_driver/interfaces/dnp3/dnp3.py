@@ -59,7 +59,8 @@ class UserDevelopRegisterDnp3(WrapperRegister):
                 return val
             else:
                 _log.warning("dnp3 driver (master) couldn't collect data from the outstation.")
-                raise ValueError(f"Returned invalid dnp3 data point {val}")  # do not publish invalid values
+                raise ValueError(f"Returned no value for dnp3 data point --"
+                                 f" group: {group}, variation: {variation}, index: {index} ")  # do not publish invalid values
         except Exception as e:
             # print(f"!!!!!!!!!!!!!!!!!!!!{e}")
             _log.error(e)
@@ -148,11 +149,11 @@ class Interface(WrapperInterface):
         """
 
         master_application = MyMasterNew(
-            masterstation_ip_str=driver_config.get("master_ip"),
-            outstation_ip_str=driver_config.get("outstation_ip"),
+            master_ip=driver_config.get("master_ip"),
+            outstation_ip=driver_config.get("outstation_ip"),
             port=driver_config.get("port"),
-            masterstation_id_int=driver_config.get("master_id"),
-            outstation_id_int=driver_config.get("outstation_id"),
+            master_id=driver_config.get("master_id"),
+            outstation_id=driver_config.get("outstation_id"),
         )
         # master_application.start()
         return master_application
