@@ -620,7 +620,9 @@ class PlatformWebService(Agent):
                    'HTTP_ACCEPT_ENCODING', 'HTTP_COOKIE', 'CONTENT_TYPE',
                    'HTTP_AUTHORIZATION', 'SERVER_NAME', 'wsgi.url_scheme',
                    'HTTP_HOST']
-        data = env['wsgi.input'].read().decode('utf-8')
+        # A websocket upgrade request (ws4py puts the raw socket in env['ws4py.socket']) carries no body; reading
+        # wsgi.input for it blocks until the client closes the connection, so the handshake would never be sent.
+        data = '' if 'ws4py.socket' in env else env['wsgi.input'].read().decode('utf-8')
         passenv = dict(
             (envlist[i], env[envlist[i]]) for i in range(0, len(envlist)) if envlist[i] in env.keys())
         if 'HTTP_COOKIE' in passenv:
@@ -661,11 +663,9 @@ class PlatformWebService(Agent):
 
         env['JINJA2_TEMPLATE_ENV'] = tplenv
 
-        # if ws4pi.socket is set then this connection is a web socket
-        # and so we return the websocket response.
-
-        if 'ws4py.socket' in env and 'vui' not in path_info:
-            return env['ws4py.socket'](env, start_response)
+        # Websocket upgrade requests are not handled here. Agent websockets registered with register_websocket are
+        # completed by WebApplicationWrapper before this method is reached, and routes that upgrade their own
+        # connections (e.g. the VUI pubsub endpoints) perform the ws4py handshake themselves below.
 
         first_segment = _first_segment(path_info)
         for entry in self.registeredroutes:
